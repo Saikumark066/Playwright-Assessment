@@ -27,8 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    # CI enables retries and a controlled worker count in playwright.config.js.
-    # These secrets are optional; the app code falls back to the public demo URL and credentials.
+    # Secrets can override the public demo configuration for a private environment.
     env:
       CI: true
       BASE_URL: ${{ secrets.BASE_URL }}
@@ -68,5 +67,5 @@ jobs:
           path: |
             playwright-report/
             test-results/
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14

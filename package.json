@@ -8,7 +8,9 @@
     "test:headed": "npx playwright test --headed",
     "test:debug": "npx playwright test --debug",
     "test:report": "npx playwright show-report",
-    "test:repeat": "npx playwright test --repeat-each=10"
+    "test:repeat": "npx playwright test --repeat-each=10",
+    "test:smoke": "npx playwright test --grep @smoke",
+    "test:parallel": "npx playwright test --grep @parallel-safe --repeat-each=2 --workers=2"
   },
   "keywords": [],
   "author": "",

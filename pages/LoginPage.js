@@ -1,54 +1,56 @@
-import { expect } from '@playwright/test';
-import 'dotenv/config';
+import { expect } from "@playwright/test";
+import { getBaseUrl, getLoginCredentials } from "../utils/environment";
 
 export class LoginPage {
   constructor(page) {
     this.page = page;
-    // Login form
-    this.usernameInput = page.getByRole('textbox', { name: 'Username' });
-    this.passwordInput = page.getByRole('textbox', { name: 'Password' });
-    this.loginButton = page.getByRole('button', { name: 'Login' });
-    // Error messages
-    this.InvalidCredentials = page.getByText('Invalid credentials');
-    this.Required = page.getByText('UsernameRequired');
+
+    this.usernameInput = page.locator('input[name="username"]');
+    this.passwordInput = page.locator('input[name="password"]');
+    this.loginButton = page.locator('button[type="submit"]');
+
+    this.invalidCredentialsMessage = page.getByText("Invalid credentials");
+    this.requiredFieldError = page.getByText("UsernameRequired");
   }
 
-  // Navigate to the login page
   async goto() {
-    const baseUrl = process.env.BASE_URL || 'https://opensource-demo.orangehrmlive.com/web/index.php/';
-    await this.page.goto(new URL('auth/login', baseUrl).toString());
+    await this.page.goto(new URL("auth/login", getBaseUrl()).toString());
   }
 
-  // Perform login action
-  async login(username = process.env.USERNAME || 'Admin', password = process.env.PASSWORD || 'admin123') {
-    await this.usernameInput.waitFor({ state: 'visible' });
-    await this.usernameInput.fill(username);
-    await this.passwordInput.fill(password);
+  async login(username, password) {
+    const credentials =
+      username === undefined && password === undefined
+        ? getLoginCredentials()
+        : { username, password };
+
+    await this.usernameInput.waitFor({ state: "visible" });
+    await this.usernameInput.fill(credentials.username);
+    await this.passwordInput.fill(credentials.password);
     await this.loginButton.click();
   }
 
-  async loginsucesss(username = process.env.USERNAME || 'Admin', password = process.env.PASSWORD || 'admin123') {
+  async loginSuccess(username, password) {
     await this.login(username, password);
   }
 
+  async loginsucesss(username, password) {
+    await this.loginSuccess(username, password);
+  }
 
-  // Verify the login page is loaded
   async verifyLoginPage() {
-    await expect(this.loginButton).toBeVisible();
+    await expect.soft(this.loginButton).toBeVisible();
   }
 
-  // Verify successful login by checking for the presence of the PIM link
   async verifyLoginSuccess() {
-    await expect(this.page.getByRole('link', { name: 'PIM' })).toBeVisible();
+    await this.page.waitForURL(/\/dashboard\//, { timeout: 20000 });
+    await expect.soft(this.page.getByRole("link", { name: "PIM" })).toBeVisible();
   }
 
-  // Verify login failure by checking for the presence of the Invalid credentials message
   async verifyLoginFailure() {
-    await expect(this.InvalidCredentials).toBeVisible();
+    await expect.soft(this.invalidCredentialsMessage).toBeVisible();
   }
 
-  // Verify login failure with empty credentials by checking for the presence of the Required message
   async verifyLoginFailureWithEmptyCredentials() {
-    await expect(this.Required).toBeVisible();
+    await expect.soft(this.requiredFieldError).toBeVisible();
   }
 }
