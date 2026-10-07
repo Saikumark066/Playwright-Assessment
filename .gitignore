@@ -1,21 +1,13 @@
-# Dependencies
 node_modules/
-
-# Environment variables
 .env
-
-# Playwright reports and test results
+.env.*
+!.env.example
 playwright-report/
 test-results/
+test-results/.auth/
 blob-report/
 playwright/.cache/
-
-# Logs
 *.log
-
-# VS Code
 .vscode/
-
-# OS files
 .DS_Store
 Thumbs.db

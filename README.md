@@ -1,10 +1,22 @@
-# Playwright Assessment
+# Playwright Assessment — OrangeHRM
 
-Playwright end-to-end and API checks for the OrangeHRM demo application.
+A Playwright JavaScript framework demonstrating UI automation, API validation, worker-scoped authentication, fixture-managed test data, RBAC coverage, parallel CI sharding, and failure reporting.
+
+## Architecture
+
+```text
+api/          REST API clients and response handling
+data/         Business test-data builders
+fixtures/     Authentication, page objects, API clients, and cleanup
+pages/        UI page objects
+tests/        Authentication, employee, API, and RBAC scenarios
+utils/        Environment, constants, ID generation, and reporting tools
+.github/      CI workflow and report handling
+```
 
 ## Setup
 
-Requirements: Node.js 22 or newer and npm.
+Requirements: Node.js 22+ and npm.
 
 ```powershell
 npm ci
@@ -12,76 +24,65 @@ npx playwright install chromium
 Copy-Item .env.example .env
 ```
 
-The example environment file uses the public OrangeHRM demo URL and its published
-demo account. Replace these values when targeting a private test environment.
-`BASE_URL` should include the application's `/web/index.php/` path. Set both
-`USERNAME` and `PASSWORD`, or leave both unset to use the public demo account.
-The `.env` file is ignored by Git; never commit credentials or other secrets.
+Set `ORANGEHRM_USERNAME` and `ORANGEHRM_PASSWORD` in `.env` or environment variables. The ESS fixture generates a unique strong password unless an environment-specific `ESS_PASSWORD` override is configured. Prefer `ORANGEHRM_USERNAME` over `USERNAME`, which is predefined by Windows and can otherwise silently override the configured OrangeHRM account. Do not commit credentials.
+
+The default environment is `demo`. For other environments, set `TEST_ENV` to `dev`, `qa`, or `stage` and provide a matching ignored `.env.<environment>` file. Environment-specific keys such as `QA_BASE_URL`, `QA_USERNAME`, `QA_PASSWORD`, and `QA_ESS_PASSWORD` take priority over generic keys; `BASE_URL`, `ORANGEHRM_USERNAME`, `ORANGEHRM_PASSWORD`, and `ESS_PASSWORD` can also be set in the selected profile file. Legacy `USERNAME` and `PASSWORD` keys remain supported in profile files. The demo URL is the only built-in URL.
 
 ## Execution
 
-```powershell
-npm test                 # Full suite
-npm run test:smoke       # Tests tagged @smoke
-npm run test:parallel    # Read-only smoke checks with two workers
-npm run test:headed      # Run with a visible browser
-npm run test:debug       # Launch Playwright Inspector
-npm run test:repeat      # Repeat tests to help expose intermittent failures
-npm run test:report      # Open the latest HTML report
-npx playwright test tests/employee.spec.js # Disabled employee-login scenario
+```text
+npm test
+npm run test:smoke
+npm run test:api
+npm run test:rbac
+npm run test:parallel
+npm run test:repeat
+npm run test:analyze-flakes
+npm run test:headed
+npm run test:debug
+npm run test:report
+npm run lint
 ```
 
-Playwright also accepts `BASE_URL`, `USERNAME`, `PASSWORD`, and `WORKERS` from
-the shell environment. In PowerShell, for example, set a worker override with
-`$env:WORKERS = "2"` before running `npm test`; CI deliberately forces one
-worker for the shared demo account. Local runs default to one worker and no
-retries so intermittent issues are visible rather than hidden.
+## Fixture and data lifecycle
 
-## Tags
+Authentication is established once per worker and saved as Playwright `storageState`. Tests use isolated browser contexts rather than repeating the Admin UI login for each test.
 
-Tests use title tags to allow focused runs:
+The `employee` fixture creates an employee through the API and removes it during teardown, including when a test fails. The `essUser` fixture similarly tracks and removes its API-created account and employee, including failures during setup. Tests that create employees directly also clean them up in `finally` blocks.
 
-- `@smoke`: basic login, page availability, or read-only employee checks
-- `@auth`: successful authentication behavior
-- `@negative`: invalid or missing input behavior
-- `@employee` / `@crud`: employee workflows
-- `@api`: API-backed tests
-- `@parallel-safe`: read-only tests suitable for concurrent execution
-- `@ci-retry`: a controlled CI-only retry demonstration
+## API strategy
 
-Use `npx playwright test --grep @api` (or any tag) to select tests. In CI,
-`@ci-retry` intentionally fails its first attempt and passes on retry to verify
-that retry evidence is collected.
+`api/EmployeeApi.js` and `api/UserApi.js` provide API operations and response parsing, not test assertions. Non-success HTTP responses and malformed response bodies raise explicit errors. Tests own business assertions.
 
-The disabled-login test creates an employee and a disabled application account
-with unique test data. Run it against a disposable or dedicated test
-environment; it adds a record to the configured OrangeHRM instance.
+The employee API operations use the OrangeHRM contract:
 
-## Flaky-test mitigation and CI artifacts
+- `POST /api/v2/pim/employees` — create
+- `GET /api/v2/pim/employees/{empNumber}` — read by employee number
+- `GET /api/v2/pim/employees?employeeId=...` — search by business Employee ID
+- `PUT /api/v2/pim/employees/{empNumber}/personal-details` — update
+- `DELETE /api/v2/pim/employees` with `{ ids: [...] }` — delete
 
-The public demo is shared, so the default and CI worker count is one. The
-parallel check repeats only the read-only login-page availability test with
-two workers. Authenticated checks against the shared demo timed out when run
-concurrently, so full runs and CI stay serialized. Prefer independent test
-data and Playwright's per-test browser contexts if adding mutating scenarios.
+Employee ID searches request one exact result rather than scanning a sorted page of records.
 
-CI retries failures twice and captures a trace on the first retry, screenshots
-on failure, and videos retained for failures. Investigate these artifacts before
-adding or increasing retries: retries are diagnostic and do not replace fixing
-timing, data-isolation, or synchronization problems. Local runs use zero retries
-to expose flakes promptly.
+## Test coverage
 
-Each run creates an HTML report in `playwright-report/` and a machine-readable
-JSON report plus failure evidence in `test-results/`. The GitHub Actions workflow
-uploads both directories as the `playwright-report-and-results` artifact even
-when tests fail; the upload step errors if no report or result files are found.
+The employee scenarios cover UI creation, API setup, read, update and delete, API CRUD, and a single UI lifecycle that verifies API state after update and deletion. RBAC coverage creates an ESS user, verifies the Admin and ESS navigation difference, and checks that direct PIM navigation does not grant access.
 
-## Design decisions
+## CI/CD and reports
 
-- Page objects keep login and employee interactions reusable across UI tests.
-- `utils/environment.js` centralizes the demo defaults and rejects partially
-  configured credentials.
-- Environment variables are loaded from `.env` by Playwright's configuration
-  using `dotenv`; CI environment values override the local file.
-- The `@smoke` selection and explicit worker override provide a safe way to
-  probe parallel stability while keeping normal runs serialized.
+GitHub Actions runs lint and a two-shard Playwright matrix. Each shard produces JSON, JUnit, and Blob reports; a follow-up job merges the Blob reports into an HTML report. Shard summaries include pass/fail counts and retry-based flaky candidates. Artifacts are uploaded even when tests fail.
+
+Manual workflow runs accept `demo`, `dev`, `qa`, or `stage`. Configure a matching GitHub Environment and its `BASE_URL`, `ORANGEHRM_USERNAME`, `ORANGEHRM_PASSWORD`, and `ESS_PASSWORD` secrets. Pull requests and pushes use the `demo` Environment.
+
+Retries are enabled only in CI. Screenshots are captured on failure, traces on the first retry, and videos are retained on failure. `--repeat-each` is available for local investigation; `utils/analyze-flakes.js` reports tests that fail and later pass.
+
+## Test tagging and design decisions
+
+Tests use Playwright's native `tag` option. Tags include `@smoke`, `@auth`, `@negative`, `@crud`, `@api`, `@rbac`, and `@parallel-safe`.
+
+1. UI page objects contain UI behavior only.
+2. API clients handle HTTP operations and response parsing; tests make assertions.
+3. Fixtures own authentication and test-data lifecycle.
+4. Data is generated centrally and mutation tests clean up after themselves.
+5. Critical checks use hard assertions.
+6. CI parallelism is enabled with sharding and unique per-test data.

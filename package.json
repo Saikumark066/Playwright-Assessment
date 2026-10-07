@@ -1,23 +1,25 @@
 {
   "name": "playwright-assessment",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Production-style Playwright automation assessment for OrangeHRM",
   "scripts": {
-    "test": "npx playwright test",
-    "test:headed": "npx playwright test --headed",
-    "test:debug": "npx playwright test --debug",
-    "test:report": "npx playwright show-report",
-    "test:repeat": "npx playwright test --repeat-each=10",
-    "test:smoke": "npx playwright test --grep @smoke",
-    "test:parallel": "npx playwright test --grep @parallel-safe --repeat-each=2 --workers=2"
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:api": "playwright test tests/api --grep @api",
+    "test:rbac": "playwright test tests/rbac --grep @rbac",
+    "test:repeat": "playwright test --repeat-each=5",
+    "test:analyze-flakes": "node utils/analyze-flakes.js",
+    "test:parallel": "playwright test --grep @parallel-safe --workers=2",
+    "lint": "eslint . --max-warnings=0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "dotenv": "^18.0.5"
+    "dotenv": "^18.0.5",
+    "eslint": "^10.12.0"
   }
 }

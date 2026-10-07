@@ -1,57 +1,35 @@
+import { defineConfig } from '@playwright/test';
+import { getBaseUrl, getWorkers, getEnvironmentName } from './utils/environment.js';
+import { TIMEOUTS } from './utils/constants.js';
 
-const { defineConfig } = require('@playwright/test');
-const { getBaseUrl } = require('./utils/environment').default;
-require('dotenv').config();
+// This config sets the default Playwright behavior for the entire project.
+// We centralize the browser, timeout, and reporting settings here so every test run starts from a consistent execution environment.
+const isCI = Boolean(process.env.CI);
 
-const requestedWorkers = process.env.WORKERS
-  ? Number(process.env.WORKERS)
-  : 1;
-
-if (!Number.isInteger(requestedWorkers) || requestedWorkers < 1) {
-  throw new Error('WORKERS must be a positive integer.');
-}
-
-module.exports = defineConfig({
+export default defineConfig({
   testDir: './tests',
-
-  // Keep the OrangeHRM demo app stable by avoiding concurrent writes across tests.
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-
-  // Retries expose transient failures in CI; local runs surface them immediately.
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : requestedWorkers,
-
-  // Test reports
+  fullyParallel: true,
+  forbidOnly: isCI,
+  retries: isCI ? 2 : 0,
+  workers: getWorkers(),
+  timeout: TIMEOUTS.test,
+  expect: { timeout: TIMEOUTS.expect },
   reporter: [
     ['list'],
     ['json', { outputFile: 'test-results/results.json' }],
-    ['html', {
-      outputFolder: 'playwright-report',
-      open: 'never'
-    }]
+    ['junit', { outputFile: 'test-results/results.xml' }],
+    ['blob'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
-
-  // Shared browser settings
   use: {
     baseURL: getBaseUrl(),
-
     browserName: 'chromium',
     headless: true,
-
-    // Capture debugging evidence
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
-
-    actionTimeout: 15000,
-    navigationTimeout: 30000
+    actionTimeout: TIMEOUTS.action,
+    navigationTimeout: TIMEOUTS.navigation,
   },
-
-  // Test timeouts
-  timeout: 30000,
-
-  expect: {
-    timeout: 10000
-  }
+  metadata: { environment: getEnvironmentName() },
 });
